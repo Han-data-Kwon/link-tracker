@@ -1,5 +1,8 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { supabase } from './lib/supabase'
+import useAuthStore from './store/authStore'
 import Layout from './components/layout/Layout'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -14,7 +17,39 @@ const queryClient = new QueryClient({
   },
 })
 
+async function fetchProfile(userId) {
+  const { setProfile, setLoading } = useAuthStore.getState()
+  setLoading(true)
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    setProfile(data)
+  } finally {
+    setLoading(false)
+  }
+}
+
 export default function App() {
+  useEffect(() => {
+    const { setUser, reset } = useAuthStore.getState()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          setUser(session.user)
+          await fetchProfile(session.user.id)
+        } else {
+          reset()
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [])
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
