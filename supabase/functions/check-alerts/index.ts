@@ -10,8 +10,6 @@ const FROM_EMAIL     = Deno.env.get('ALERT_FROM_EMAIL') ?? 'alerts@example.com'
 
 // ──────────────────────────────────────────────
 // 이메일 발송 (Resend API 사용)
-// Supabase Dashboard > Edge Functions > Secrets 에
-// RESEND_API_KEY 와 ALERT_FROM_EMAIL 을 등록하세요.
 // ──────────────────────────────────────────────
 async function sendEmail(to: string, subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
@@ -30,15 +28,38 @@ async function sendEmail(to: string, subject: string, html: string) {
 }
 
 // ──────────────────────────────────────────────
+// 마지막 발송 시각 조회 (alert_logs 기준)
+// ──────────────────────────────────────────────
+async function getLastSentAt(alertId: string): Promise<Date | null> {
+  const { data } = await supabase
+    .from('alert_logs')
+    .select('created_at')
+    .eq('alert_id', alertId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  return data ? new Date(data.created_at) : null
+}
+
+// ──────────────────────────────────────────────
 // traffic_spike 조건 체크
 // 최근 1시간 클릭 수 >= 지난 7일 시간당 평균 * threshold
+// 중복 방지: 마지막 발송 후 1시간이 지나야 재발송
 // ──────────────────────────────────────────────
 async function checkTrafficSpike(alert: Record<string, unknown>): Promise<boolean> {
-  const linkId   = alert.link_id as string
+  const alertId   = alert.id as string
+  const linkId    = alert.link_id as string
   const threshold = Number(alert.threshold)
   const now       = new Date()
-  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const oneHourAgo    = new Date(now.getTime() - 60 * 60 * 1000)
+  const sevenDaysAgo  = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  // 중복 발송 방지: 마지막 발송 후 1시간 미경과 시 스킵
+  const lastSent = await getLastSentAt(alertId)
+  if (lastSent && now.getTime() - lastSent.getTime() < 60 * 60 * 1000) {
+    return false
+  }
 
   const [{ count: recentCount }, { count: baseCount }] = await Promise.all([
     supabase
@@ -63,12 +84,21 @@ async function checkTrafficSpike(alert: Record<string, unknown>): Promise<boolea
 
 // ──────────────────────────────────────────────
 // no_traffic 조건 체크
-// 최근 N시간 동안 클릭 0
+// 최근 threshold 시간 동안 클릭 0
+// 중복 방지: 마지막 발송 후 threshold 시간이 지나야 재발송
 // ──────────────────────────────────────────────
 async function checkNoTraffic(alert: Record<string, unknown>): Promise<boolean> {
-  const linkId   = alert.link_id as string
-  const hours     = Number(alert.threshold)
-  const since     = new Date(Date.now() - hours * 60 * 60 * 1000)
+  const alertId = alert.id as string
+  const linkId  = alert.link_id as string
+  const hours   = Number(alert.threshold)
+  const now     = new Date()
+  const since   = new Date(now.getTime() - hours * 60 * 60 * 1000)
+
+  // 중복 발송 방지: 마지막 발송 후 threshold 시간 미경과 시 스킵
+  const lastSent = await getLastSentAt(alertId)
+  if (lastSent && now.getTime() - lastSent.getTime() < hours * 60 * 60 * 1000) {
+    return false
+  }
 
   const { count } = await supabase
     .from('clicks')
@@ -110,7 +140,7 @@ Deno.serve(async (_req) => {
           continue
         }
 
-        const link     = alert.links as Record<string, string>
+        const link      = alert.links as Record<string, string>
         const typeLabel = alert.alert_type === 'traffic_spike' ? '트래픽 급증' : '트래픽 없음'
         const subject   = `[Link Tracker 레이더] ${link.title || link.slug} - ${typeLabel} 감지`
         const html      = `

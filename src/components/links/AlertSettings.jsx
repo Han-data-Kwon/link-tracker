@@ -132,7 +132,7 @@ export default function AlertSettings({ linkId, linkTitle, open, onClose }) {
                 onChange={e => handleChange('alertType', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <option value="traffic_spike">트래픽 급증 — 최근 1시간이 시간당 평균의 N배 이상</option>
+                <option value="traffic_spike">트래픽 급증 — 최근 1시간 내 시간당 평균의 N배 이상</option>
                 <option value="no_traffic">트래픽 없음 — N시간 동안 클릭 없음</option>
               </select>
             </div>
