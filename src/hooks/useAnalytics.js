@@ -7,7 +7,20 @@ export function useHourlyStats() {
     queryKey: ['hourly-stats'],
     queryFn: async () => {
       const now = new Date()
-      const since = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      // 현재 시각을 정각으로 내림 (date-fns는 브라우저 로컬 TZ = KST 사용)
+      const nowHour = new Date(now)
+      nowHour.setMinutes(0, 0, 0)
+
+      // 24개 슬롯: (nowHour - 23h) ~ nowHour (현재 시간대 포함)
+      const slots = {}
+      for (let i = 23; i >= 0; i--) {
+        const slotTime = new Date(nowHour.getTime() - i * 60 * 60 * 1000)
+        const key = format(slotTime, 'yyyy-MM-dd HH')
+        slots[key] = { hour: format(slotTime, 'HH:00'), clicks: 0 }
+      }
+
+      // 쿼리 범위: 가장 오래된 슬롯 시작부터 현재까지
+      const since = new Date(nowHour.getTime() - 23 * 60 * 60 * 1000)
 
       const { data, error } = await supabase
         .from('clicks')
@@ -16,14 +29,7 @@ export function useHourlyStats() {
 
       if (error) throw error
 
-      // 24개 시간 슬롯 초기화
-      const slots = {}
-      for (let i = 0; i < 24; i++) {
-        const slotTime = new Date(since.getTime() + i * 60 * 60 * 1000)
-        const key = format(slotTime, 'yyyy-MM-dd HH')
-        slots[key] = { hour: format(slotTime, 'HH:00'), clicks: 0 }
-      }
-
+      // clicked_at은 UTC ISO 문자열 → new Date()로 파싱 시 KST 로컬 TZ로 format됨
       for (const row of data ?? []) {
         const key = format(new Date(row.clicked_at), 'yyyy-MM-dd HH')
         if (slots[key]) slots[key].clicks++
