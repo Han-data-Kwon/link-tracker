@@ -2,8 +2,8 @@ import { useTopLinks } from '../../hooks/useAnalytics'
 import Spinner from '../ui/Spinner'
 import Badge from '../ui/Badge'
 
-export default function TopLinks() {
-  const { data: links = [], isLoading } = useTopLinks(10)
+export default function TopLinks({ linkIds = [] }) {
+  const { data: links = [], isLoading } = useTopLinks({ limit: 10, linkIds })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">

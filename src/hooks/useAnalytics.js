@@ -2,16 +2,29 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { subDays, format } from 'date-fns'
 
-export function useHourlyStats() {
+export function useActiveLinks() {
   return useQuery({
-    queryKey: ['hourly-stats'],
+    queryKey: ['active-links'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('links')
+        .select('id, title, slug')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data ?? []
+    },
+  })
+}
+
+export function useHourlyStats({ linkIds = [] } = {}) {
+  return useQuery({
+    queryKey: ['hourly-stats', linkIds],
     queryFn: async () => {
       const now = new Date()
-      // 현재 시각을 정각으로 내림 (date-fns는 브라우저 로컬 TZ = KST 사용)
       const nowHour = new Date(now)
       nowHour.setMinutes(0, 0, 0)
 
-      // 24개 슬롯: (nowHour - 23h) ~ nowHour (현재 시간대 포함)
       const slots = {}
       for (let i = 23; i >= 0; i--) {
         const slotTime = new Date(nowHour.getTime() - i * 60 * 60 * 1000)
@@ -19,17 +32,18 @@ export function useHourlyStats() {
         slots[key] = { hour: format(slotTime, 'HH:00'), clicks: 0 }
       }
 
-      // 쿼리 범위: 가장 오래된 슬롯 시작부터 현재까지
       const since = new Date(nowHour.getTime() - 23 * 60 * 60 * 1000)
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('clicks')
         .select('clicked_at')
         .gte('clicked_at', since.toISOString())
 
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
+
+      const { data, error } = await query
       if (error) throw error
 
-      // clicked_at은 UTC ISO 문자열 → new Date()로 파싱 시 KST 로컬 TZ로 format됨
       for (const row of data ?? []) {
         const key = format(new Date(row.clicked_at), 'yyyy-MM-dd HH')
         if (slots[key]) slots[key].clicks++
@@ -40,9 +54,9 @@ export function useHourlyStats() {
   })
 }
 
-export function useDailyStats({ linkId, days = 30 } = {}) {
+export function useDailyStats({ linkIds = [], days = 30 } = {}) {
   return useQuery({
-    queryKey: ['daily-stats', linkId, days],
+    queryKey: ['daily-stats', linkIds, days],
     queryFn: async () => {
       const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
       let query = supabase
@@ -52,7 +66,7 @@ export function useDailyStats({ linkId, days = 30 } = {}) {
         .gte('click_date', since)
         .order('click_date', { ascending: true })
 
-      if (linkId) query = query.eq('link_id', linkId)
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
 
       const { data, error } = await query
       if (error) throw error
@@ -69,14 +83,18 @@ export function useDailyStats({ linkId, days = 30 } = {}) {
   })
 }
 
-export function useSummaryStats() {
+export function useSummaryStats({ linkIds = [] } = {}) {
   return useQuery({
-    queryKey: ['summary-stats'],
+    queryKey: ['summary-stats', linkIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('link_total_stats')
         .select('total_impressions, unique_clicks, created_at')
         .eq('is_active', true)
+
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
+
+      const { data, error } = await query
       if (error) throw error
 
       const total = data ?? []
@@ -89,44 +107,92 @@ export function useSummaryStats() {
   })
 }
 
-export function useTagStats() {
+export function useTagStats({ linkIds = [] } = {}) {
   return useQuery({
-    queryKey: ['tag-stats'],
+    queryKey: ['tag-stats', linkIds],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tag_stats')
-        .select('*')
-        .order('total_impressions', { ascending: false })
-      if (error) throw error
-      return data ?? []
+      if (linkIds.length === 0) {
+        const { data, error } = await supabase
+          .from('tag_stats')
+          .select('*')
+          .order('total_impressions', { ascending: false })
+        if (error) throw error
+        return data ?? []
+      }
+
+      // 선택된 링크에 연결된 태그 조회
+      const { data: ltData, error: ltErr } = await supabase
+        .from('link_tags')
+        .select('link_id, tag_id')
+        .in('link_id', linkIds)
+      if (ltErr) throw ltErr
+
+      const tagIds = [...new Set((ltData ?? []).map(r => r.tag_id))]
+      if (tagIds.length === 0) return []
+
+      const [{ data: tagsData, error: tagsErr }, { data: statsData, error: statsErr }] =
+        await Promise.all([
+          supabase.from('tags').select('id, name, color').in('id', tagIds),
+          supabase.from('link_total_stats').select('link_id, total_impressions, unique_clicks').in('link_id', linkIds),
+        ])
+      if (tagsErr) throw tagsErr
+      if (statsErr) throw statsErr
+
+      const statsMap = {}
+      for (const s of statsData ?? []) statsMap[s.link_id] = s
+
+      const tagMap = {}
+      for (const lt of ltData ?? []) {
+        if (!tagMap[lt.tag_id]) {
+          const tag = (tagsData ?? []).find(t => t.id === lt.tag_id)
+          if (!tag) continue
+          tagMap[lt.tag_id] = { tag_id: tag.id, tag_name: tag.name, color: tag.color, link_count: 0, total_impressions: 0, unique_clicks: 0 }
+        }
+        tagMap[lt.tag_id].link_count++
+        const s = statsMap[lt.link_id]
+        if (s) {
+          tagMap[lt.tag_id].total_impressions += Number(s.total_impressions) || 0
+          tagMap[lt.tag_id].unique_clicks     += Number(s.unique_clicks)     || 0
+        }
+      }
+
+      return Object.values(tagMap).sort((a, b) => b.total_impressions - a.total_impressions)
     },
   })
 }
 
-export function useTopLinks(limit = 10) {
+export function useTopLinks({ limit = 10, linkIds = [] } = {}) {
   return useQuery({
-    queryKey: ['top-links', limit],
+    queryKey: ['top-links', limit, linkIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('link_total_stats')
         .select('*')
         .eq('is_active', true)
         .order('total_impressions', { ascending: false })
         .limit(limit)
+
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
+
+      const { data, error } = await query
       if (error) throw error
       return data ?? []
     },
   })
 }
 
-export function useSourceBreakdown() {
+export function useSourceBreakdown({ linkIds = [] } = {}) {
   return useQuery({
-    queryKey: ['source-breakdown'],
+    queryKey: ['source-breakdown', linkIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('link_daily_stats')
         .select('utm_source, total_impressions, unique_clicks')
         .eq('is_active', true)
+
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
+
+      const { data, error } = await query
       if (error) throw error
 
       const bySource = {}

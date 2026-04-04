@@ -5,8 +5,8 @@ import {
 import { useHourlyStats } from '../../hooks/useAnalytics'
 import Spinner from '../ui/Spinner'
 
-export default function HourlyChart() {
-  const { data = [], isLoading } = useHourlyStats()
+export default function HourlyChart({ linkIds = [] }) {
+  const { data = [], isLoading } = useHourlyStats({ linkIds })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import { useState, useEffect, useRef } from 'react'
+import { format, subDays } from 'date-fns'
 import { useQueryClient } from '@tanstack/react-query'
 import StatsCard from '../components/dashboard/StatsCard'
 import ClickChart from '../components/dashboard/ClickChart'
@@ -9,17 +9,95 @@ import TopLinks from '../components/dashboard/TopLinks'
 import SourceBreakdown from '../components/dashboard/SourceBreakdown'
 import RadarSection from '../components/dashboard/RadarSection'
 import Button from '../components/ui/Button'
-import { useSummaryStats, useDailyStats } from '../hooks/useAnalytics'
+import { useSummaryStats, useActiveLinks } from '../hooks/useAnalytics'
+import { supabase } from '../lib/supabase'
 import { downloadCsv } from '../lib/csv'
 
 const DAY_OPTIONS = [7, 14, 30, 90]
 
+function LinkFilterDropdown({ links, selectedIds, onChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  function toggleAll() {
+    onChange([])
+  }
+
+  function toggleLink(id) {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(x => x !== id))
+    } else {
+      onChange([...selectedIds, id])
+    }
+  }
+
+  const label = selectedIds.length === 0
+    ? '전체 링크'
+    : `${selectedIds.length}개 선택됨`
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors font-medium text-gray-700"
+      >
+        <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+        </svg>
+        {label}
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-lg w-64 max-h-72 overflow-y-auto">
+          {/* 전체 선택 */}
+          <label className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+            <input
+              type="checkbox"
+              checked={selectedIds.length === 0}
+              onChange={toggleAll}
+              className="rounded border-gray-300 text-indigo-600"
+            />
+            <span className="text-sm font-medium text-gray-800">전체</span>
+          </label>
+          {links.map(link => (
+            <label key={link.id} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(link.id)}
+                onChange={() => toggleLink(link.id)}
+                className="rounded border-gray-300 text-indigo-600"
+              />
+              <span className="text-sm text-gray-700 truncate">{link.title || link.slug}</span>
+            </label>
+          ))}
+          {links.length === 0 && (
+            <p className="text-center py-4 text-sm text-gray-400">링크가 없습니다</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [days, setDays] = useState(30)
+  const [selectedLinkIds, setSelectedLinkIds] = useState([])
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const queryClient = useQueryClient()
-  const { data: summary, isLoading } = useSummaryStats()
-  const { data: dailyStats = [] } = useDailyStats({ days })
+  const { data: summary, isLoading } = useSummaryStats({ linkIds: selectedLinkIds })
+  const { data: activeLinks = [] } = useActiveLinks()
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -29,20 +107,47 @@ export default function DashboardPage() {
     return () => clearInterval(timer)
   }, [queryClient])
 
-  function handleDownload() {
-    const rows = dailyStats.map(r => ({
-      '날짜':                  r.date,
-      '총 클릭(Impression)':   r.impressions,
-      '순 방문자(Unique)':     r.unique,
+  async function handleDownload() {
+    const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
+    let query = supabase
+      .from('link_daily_stats')
+      .select('title, slug, click_date, utm_source, utm_medium, utm_campaign, total_impressions, unique_clicks')
+      .eq('is_active', true)
+      .gte('click_date', since)
+      .order('click_date', { ascending: true })
+      .order('title', { ascending: true })
+
+    if (selectedLinkIds.length > 0) query = query.in('link_id', selectedLinkIds)
+
+    const { data, error } = await query
+    if (error) { console.error(error); return }
+
+    const rows = (data ?? []).map(r => ({
+      '링크명':        r.title || r.slug || '',
+      '날짜':          r.click_date || '',
+      'utm_source':    r.utm_source  || '',
+      'utm_medium':    r.utm_medium  || '',
+      'utm_campaign':  r.utm_campaign || '',
+      'Impression':    r.total_impressions || 0,
+      'Unique':        r.unique_clicks     || 0,
     }))
+
     downloadCsv(rows, `dashboard_stats_${format(new Date(), 'yyyy-MM-dd')}.csv`)
   }
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* 링크 필터 드롭다운 */}
+          <LinkFilterDropdown
+            links={activeLinks}
+            selectedIds={selectedLinkIds}
+            onChange={setSelectedLinkIds}
+          />
+
+          {/* 기간 선택 */}
           <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
             {DAY_OPTIONS.map(d => (
               <button
@@ -58,11 +163,11 @@ export default function DashboardPage() {
               </button>
             ))}
           </div>
+
           <Button
             variant="secondary"
             size="sm"
             onClick={handleDownload}
-            disabled={dailyStats.length === 0}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -113,19 +218,19 @@ export default function DashboardPage() {
       </div>
 
       {/* 일별 클릭 차트 */}
-      <ClickChart days={days} />
+      <ClickChart days={days} linkIds={selectedLinkIds} />
 
       {/* 시간대별 클릭 차트 */}
-      <HourlyChart />
+      <HourlyChart linkIds={selectedLinkIds} />
 
       {/* 하단 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <TopLinks />
+          <TopLinks linkIds={selectedLinkIds} />
         </div>
         <div className="space-y-6">
-          <SourceBreakdown />
-          <TagBreakdown />
+          <SourceBreakdown linkIds={selectedLinkIds} />
+          <TagBreakdown linkIds={selectedLinkIds} />
         </div>
       </div>
 

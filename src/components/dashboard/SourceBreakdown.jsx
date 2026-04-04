@@ -6,8 +6,8 @@ import Spinner from '../ui/Spinner'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316']
 
-export default function SourceBreakdown() {
-  const { data = [], isLoading } = useSourceBreakdown()
+export default function SourceBreakdown({ linkIds = [] }) {
+  const { data = [], isLoading } = useSourceBreakdown({ linkIds })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">

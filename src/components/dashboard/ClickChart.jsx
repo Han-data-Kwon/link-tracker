@@ -5,8 +5,8 @@ import {
 import { useDailyStats } from '../../hooks/useAnalytics'
 import Spinner from '../ui/Spinner'
 
-export default function ClickChart({ days = 30 }) {
-  const { data = [], isLoading } = useDailyStats({ days })
+export default function ClickChart({ days = 30, linkIds = [] }) {
+  const { data = [], isLoading } = useDailyStats({ days, linkIds })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">

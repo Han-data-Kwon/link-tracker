@@ -5,8 +5,8 @@ import {
 import { useTagStats } from '../../hooks/useAnalytics'
 import Spinner from '../ui/Spinner'
 
-export default function TagBreakdown() {
-  const { data = [], isLoading } = useTagStats()
+export default function TagBreakdown({ linkIds = [] }) {
+  const { data = [], isLoading } = useTagStats({ linkIds })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
