@@ -4,9 +4,10 @@ import { isEmailAllowed } from '../../constants/allowedEmails'
 import Spinner from '../ui/Spinner'
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth()
+  const { user, ready } = useAuth()
 
-  if (loading) {
+  // 세션 확인 전 (최대 3초)
+  if (!ready) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Spinner size="lg" />
@@ -14,8 +15,10 @@ export default function ProtectedRoute({ children }) {
     )
   }
 
+  // 세션 없음 → 로그인
   if (!user) return <Navigate to="/login" replace />
 
+  // 허용되지 않은 이메일
   if (!isEmailAllowed(user.email)) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4">
@@ -25,12 +28,6 @@ export default function ProtectedRoute({ children }) {
             {user.email} 계정은 허용되지 않습니다.<br />
             관리자에게 문의해 주세요.
           </p>
-          <button
-            onClick={() => useAuth().signOut()}
-            className="text-primary-600 hover:underline text-sm"
-          >
-            다른 계정으로 로그인
-          </button>
         </div>
       </div>
     )

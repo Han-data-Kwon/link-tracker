@@ -17,37 +17,59 @@ const queryClient = new QueryClient({
   },
 })
 
-async function fetchProfile(userId) {
-  const { setProfile, setLoading } = useAuthStore.getState()
-  setLoading(true)
+async function resolveSession(user) {
+  const { setUser, setProfile, setReady } = useAuthStore.getState()
+  setUser(user)
   try {
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('id', user.id)
       .single()
     setProfile(data)
+  } catch (_) {
+    // 프로필 조회 실패해도 세션은 유효하므로 ready 처리
   } finally {
-    setLoading(false)
+    setReady(true)
   }
 }
 
 export default function App() {
   useEffect(() => {
-    const { setUser, reset } = useAuthStore.getState()
+    const { setReady, reset } = useAuthStore.getState()
 
+    // 1) 즉시 현재 세션 확인 (가장 확실한 초기화 경로)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        resolveSession(session.user)
+      } else {
+        reset() // ready: true, user: null → ProtectedRoute가 /login으로 이동
+      }
+    })
+
+    // 2) 이후 로그인/로그아웃 상태 변화만 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setUser(session.user)
-          await fetchProfile(session.user.id)
-        } else {
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          resolveSession(session.user)
+        } else if (event === 'SIGNED_OUT') {
           reset()
         }
+        // INITIAL_SESSION은 getSession()에서 이미 처리하므로 무시
       }
     )
 
-    return () => subscription.unsubscribe()
+    // 3) 3초 타임아웃: 어떤 이유로든 ready가 안 됐으면 강제로 ready 처리
+    const timeout = setTimeout(() => {
+      if (!useAuthStore.getState().ready) {
+        reset()
+      }
+    }, 3000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   return (

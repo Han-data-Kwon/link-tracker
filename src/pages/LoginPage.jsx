@@ -5,14 +5,14 @@ import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 
 export default function LoginPage() {
-  const { user, loading, signInWithGoogle } = useAuth()
+  const { user, ready, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!loading && user) navigate('/dashboard', { replace: true })
-  }, [user, loading, navigate])
+    if (ready && user) navigate('/dashboard', { replace: true })
+  }, [user, ready, navigate])
 
-  if (loading) {
+  if (!ready) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Spinner size="lg" />

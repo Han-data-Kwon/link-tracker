@@ -1,17 +1,14 @@
 import { supabase } from '../lib/supabase'
 import useAuthStore from '../store/authStore'
 
-// 구독은 App.jsx에서 useAuthInit()으로 딱 한 번만 초기화합니다.
-// useAuth()는 스토어에서 상태를 읽고 액션만 제공합니다.
+// 상태 읽기 + 액션만 제공. 구독/초기화는 App.jsx에서 단 1회 처리.
 export function useAuth() {
-  const { user, profile, loading } = useAuthStore()
+  const { user, profile, ready } = useAuthStore()
 
   async function signInWithGoogle() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
+      options: { redirectTo: `${window.location.origin}/dashboard` },
     })
     if (error) throw error
   }
@@ -21,5 +18,5 @@ export function useAuth() {
     useAuthStore.getState().reset()
   }
 
-  return { user, profile, loading, signInWithGoogle, signOut }
+  return { user, profile, ready, signInWithGoogle, signOut }
 }
