@@ -6,17 +6,8 @@ export function useAuth() {
   const { user, profile, loading, setUser, setProfile, setLoading, reset } = useAuthStore()
 
   useEffect(() => {
-    // 현재 세션 로드
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        fetchProfile(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
-
-    // 인증 상태 변화 구독
+    // onAuthStateChange가 구독 즉시 INITIAL_SESSION을 발생시키므로
+    // getSession() 중복 호출 없이 여기서만 세션 복원 처리
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
@@ -33,13 +24,16 @@ export function useAuth() {
 
   async function fetchProfile(userId) {
     setLoading(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      setProfile(data)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function signInWithGoogle() {
