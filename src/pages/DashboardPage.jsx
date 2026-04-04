@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
+import { useQueryClient } from '@tanstack/react-query'
 import StatsCard from '../components/dashboard/StatsCard'
 import ClickChart from '../components/dashboard/ClickChart'
+import HourlyChart from '../components/dashboard/HourlyChart'
 import TagBreakdown from '../components/dashboard/TagBreakdown'
 import TopLinks from '../components/dashboard/TopLinks'
 import SourceBreakdown from '../components/dashboard/SourceBreakdown'
@@ -14,8 +16,18 @@ const DAY_OPTIONS = [7, 14, 30, 90]
 
 export default function DashboardPage() {
   const [days, setDays] = useState(30)
+  const [lastUpdated, setLastUpdated] = useState(new Date())
+  const queryClient = useQueryClient()
   const { data: summary, isLoading } = useSummaryStats()
   const { data: dailyStats = [] } = useDailyStats({ days })
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      queryClient.invalidateQueries()
+      setLastUpdated(new Date())
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [queryClient])
 
   function handleDownload() {
     const rows = dailyStats.map(r => ({
@@ -27,7 +39,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">대시보드</h1>
         <div className="flex items-center gap-3">
@@ -100,8 +112,11 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* 클릭 차트 */}
+      {/* 일별 클릭 차트 */}
       <ClickChart days={days} />
+
+      {/* 시간대별 클릭 차트 */}
+      <HourlyChart />
 
       {/* 하단 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -124,6 +139,11 @@ export default function DashboardPage() {
           캠페인 레이더
         </h2>
         <RadarSection />
+      </div>
+
+      {/* 마지막 업데이트 */}
+      <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm text-xs text-gray-500">
+        마지막 업데이트: {format(lastUpdated, 'HH:mm:ss')}
       </div>
     </div>
   )

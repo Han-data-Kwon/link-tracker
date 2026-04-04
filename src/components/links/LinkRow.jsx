@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { format } from 'date-fns'
 import { useToggleLinkActive } from '../../hooks/useLinks'
 import Badge from '../ui/Badge'
 import QRModal from './QRModal'
@@ -50,6 +51,11 @@ export default function LinkRow({ link }) {
             <span className="text-lg font-bold text-gray-900">{link.total_impressions ?? 0}</span>
             <span className="text-xs text-gray-400">Unique: {link.unique_clicks ?? 0}</span>
           </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-xs text-gray-500 whitespace-nowrap">
+            {link.created_at ? format(new Date(link.created_at), 'yyyy-MM-dd HH:mm') : '-'}
+          </span>
         </td>
         <td className="px-4 py-3">
           <button

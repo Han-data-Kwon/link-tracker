@@ -2,6 +2,38 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { subDays, format } from 'date-fns'
 
+export function useHourlyStats() {
+  return useQuery({
+    queryKey: ['hourly-stats'],
+    queryFn: async () => {
+      const now = new Date()
+      const since = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+      const { data, error } = await supabase
+        .from('clicks')
+        .select('clicked_at')
+        .gte('clicked_at', since.toISOString())
+
+      if (error) throw error
+
+      // 24개 시간 슬롯 초기화
+      const slots = {}
+      for (let i = 0; i < 24; i++) {
+        const slotTime = new Date(since.getTime() + i * 60 * 60 * 1000)
+        const key = format(slotTime, 'yyyy-MM-dd HH')
+        slots[key] = { hour: format(slotTime, 'HH:00'), clicks: 0 }
+      }
+
+      for (const row of data ?? []) {
+        const key = format(new Date(row.clicked_at), 'yyyy-MM-dd HH')
+        if (slots[key]) slots[key].clicks++
+      }
+
+      return Object.values(slots)
+    },
+  })
+}
+
 export function useDailyStats({ linkId, days = 30 } = {}) {
   return useQuery({
     queryKey: ['daily-stats', linkId, days],

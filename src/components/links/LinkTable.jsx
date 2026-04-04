@@ -44,7 +44,7 @@ export default function LinkTable() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                {['링크', '슬러그', 'UTM', '클릭', '활성', '액션'].map(h => (
+                {['링크', '슬러그', 'UTM', '클릭', '생성일시', '활성', '액션'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     {h}
                   </th>

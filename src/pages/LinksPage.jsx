@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
+import { useQueryClient } from '@tanstack/react-query'
 import LinkTable from '../components/links/LinkTable'
 import Button from '../components/ui/Button'
 import { useLinks } from '../hooks/useLinks'
@@ -7,7 +9,17 @@ import { downloadCsv } from '../lib/csv'
 
 export default function LinksPage() {
   const navigate = useNavigate()
+  const [lastUpdated, setLastUpdated] = useState(new Date())
+  const queryClient = useQueryClient()
   const { data: links = [] } = useLinks()
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['links'] })
+      setLastUpdated(new Date())
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [queryClient])
 
   function handleDownload() {
     const rows = links.map(l => ({
@@ -28,7 +40,7 @@ export default function LinksPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">링크 관리</h1>
         <div className="flex items-center gap-2">
@@ -50,6 +62,11 @@ export default function LinksPage() {
         </div>
       </div>
       <LinkTable />
+
+      {/* 마지막 업데이트 */}
+      <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm text-xs text-gray-500">
+        마지막 업데이트: {format(lastUpdated, 'HH:mm:ss')}
+      </div>
     </div>
   )
 }
