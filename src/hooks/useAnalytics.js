@@ -10,6 +10,7 @@ export function useDailyStats({ linkId, days = 30 } = {}) {
       let query = supabase
         .from('link_daily_stats')
         .select('click_date, total_impressions, unique_clicks, utm_source, utm_medium, utm_campaign')
+        .eq('is_active', true)
         .gte('click_date', since)
         .order('click_date', { ascending: true })
 
@@ -18,7 +19,6 @@ export function useDailyStats({ linkId, days = 30 } = {}) {
       const { data, error } = await query
       if (error) throw error
 
-      // 날짜별 집계
       const byDate = {}
       for (const row of data ?? []) {
         const d = row.click_date
@@ -38,6 +38,7 @@ export function useSummaryStats() {
       const { data, error } = await supabase
         .from('link_total_stats')
         .select('total_impressions, unique_clicks, created_at')
+        .eq('is_active', true)
       if (error) throw error
 
       const total = data ?? []
@@ -71,6 +72,7 @@ export function useTopLinks(limit = 10) {
       const { data, error } = await supabase
         .from('link_total_stats')
         .select('*')
+        .eq('is_active', true)
         .order('total_impressions', { ascending: false })
         .limit(limit)
       if (error) throw error
@@ -86,6 +88,7 @@ export function useSourceBreakdown() {
       const { data, error } = await supabase
         .from('link_daily_stats')
         .select('utm_source, total_impressions, unique_clicks')
+        .eq('is_active', true)
       if (error) throw error
 
       const bySource = {}

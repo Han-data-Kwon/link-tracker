@@ -3,6 +3,21 @@ import { buildUtmUrl } from './utm'
 import { generateSlug } from './slug'
 
 /**
+ * 데이터 배열을 CSV 파일로 다운로드
+ * UTF-8 BOM 포함 (Excel 한글 깨짐 방지)
+ */
+export function downloadCsv(rows, filename) {
+  const csv = Papa.unparse(rows)
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
  * CSV 파일 파싱 후 링크 배열 반환
  * 필수 컬럼: destination_url
  * 선택 컬럼: title, utm_source, utm_medium, utm_campaign, utm_term, utm_content, slug, tags

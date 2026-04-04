@@ -26,8 +26,8 @@ export default function RedirectPage() {
         setError('만료된 링크입니다'); return
       }
 
-      // 2. 클릭 이벤트 기록 (비동기, 결과 무시하고 바로 리다이렉트)
-      recordClick(link.id)
+      // 2. 클릭 기록 후 리다이렉트 (await: 브라우저가 이동 전에 INSERT 완료 보장)
+      await recordClick(link.id)
 
       // 3. 리다이렉트
       window.location.replace(link.full_url)
