@@ -9,7 +9,11 @@ export default function LinkTable() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [timer, setTimer] = useState(null)
 
-  const { data: links = [], isLoading, error } = useLinks({ search: debouncedSearch })
+  const { data: rawLinks = [], isLoading, error } = useLinks({ search: debouncedSearch })
+  const links = [
+    ...rawLinks.filter(l => l.is_active),
+    ...rawLinks.filter(l => !l.is_active),
+  ]
 
   function handleSearch(val) {
     setSearch(val)
@@ -21,7 +25,11 @@ export default function LinkTable() {
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
         <h2 className="text-base font-semibold text-gray-900">
-          링크 목록 <span className="text-gray-400 font-normal text-sm">({links.length}개)</span>
+          링크 목록{' '}
+          <span className="text-gray-400 font-normal text-sm">
+            ({rawLinks.filter(l => l.is_active).length}개 활성
+            {rawLinks.filter(l => !l.is_active).length > 0 && ` / ${rawLinks.filter(l => !l.is_active).length}개 비활성`})
+          </span>
         </h2>
         <Input
           placeholder="제목, 슬러그, 캠페인 검색..."
@@ -35,7 +43,7 @@ export default function LinkTable() {
         <div className="flex justify-center py-12"><Spinner /></div>
       ) : error ? (
         <p className="text-center py-12 text-red-500 text-sm">{error.message}</p>
-      ) : links.length === 0 ? (
+      ) : rawLinks.length === 0 ? (
         <p className="text-center py-12 text-gray-400 text-sm">
           {search ? '검색 결과가 없습니다' : '아직 생성된 링크가 없습니다'}
         </p>

@@ -22,7 +22,7 @@ export default function LinkRow({ link }) {
 
   return (
     <>
-      <tr className="hover:bg-gray-50 border-b border-gray-100">
+      <tr className={`border-b border-gray-100 ${link.is_active ? 'hover:bg-gray-50' : 'opacity-50 bg-gray-50 grayscale-[30%]'}`}>
         <td className="px-4 py-3">
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium text-gray-900">{link.title || '(제목 없음)'}</span>
@@ -58,18 +58,21 @@ export default function LinkRow({ link }) {
           </span>
         </td>
         <td className="px-4 py-3">
-          <button
-            onClick={() => toggleActive.mutate({ id: linkId, is_active: !link.is_active })}
-            className={`relative inline-flex h-5 w-9 rounded-full transition-colors focus:outline-none ${
-              link.is_active ? 'bg-primary-600' : 'bg-gray-300'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-white shadow transition-transform ${
-                link.is_active ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+          {link.is_active ? (
+            <button
+              onClick={() => toggleActive.mutate({ id: linkId, is_active: false })}
+              className="relative inline-flex h-5 w-9 rounded-full transition-colors focus:outline-none bg-primary-600"
+            >
+              <span className="inline-block h-4 w-4 mt-0.5 rounded-full bg-white shadow transition-transform translate-x-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => toggleActive.mutate({ id: linkId, is_active: true })}
+              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium transition-colors whitespace-nowrap"
+            >
+              재활성화
+            </button>
+          )}
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1">

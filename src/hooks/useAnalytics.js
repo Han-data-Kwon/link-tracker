@@ -36,7 +36,8 @@ export function useHourlyStats({ linkIds = [] } = {}) {
 
       let query = supabase
         .from('clicks')
-        .select('clicked_at')
+        .select('clicked_at, links!inner(is_active)')
+        .eq('links.is_active', true)
         .gte('clicked_at', since.toISOString())
 
       if (linkIds.length > 0) query = query.in('link_id', linkIds)

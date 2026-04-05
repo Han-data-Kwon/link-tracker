@@ -39,11 +39,13 @@ export function useRecentAlertLogs(limit = 20) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('alert_logs')
-        .select('*, alerts(alert_type, threshold, links(title, slug))')
+        .select('*, alerts!inner(alert_type, threshold, links!inner(title, slug, is_active))')
+        .eq('alerts.links.is_active', true)
         .order('triggered_at', { ascending: false })
         .limit(limit)
       if (error) throw error
-      return data ?? []
+      // 클라이언트 측 보조 필터 (중첩 조인 필터가 누락될 경우 대비)
+      return (data ?? []).filter(log => log.alerts?.links?.is_active !== false)
     },
   })
 }

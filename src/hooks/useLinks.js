@@ -117,6 +117,15 @@ export function useToggleLinkActive() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
+      queryClient.invalidateQueries({ queryKey: ['active-links'] })
+      queryClient.invalidateQueries({ queryKey: ['hourly-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['daily-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['summary-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['top-links'] })
+      queryClient.invalidateQueries({ queryKey: ['source-breakdown'] })
+      queryClient.invalidateQueries({ queryKey: ['tag-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['alerts-all'] })
+      queryClient.invalidateQueries({ queryKey: ['alert-logs'] })
     },
   })
 }
