@@ -24,8 +24,9 @@ export function useAllAlerts() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('alerts')
-        .select('*, links(title, slug)')
+        .select('*, links!inner(title, slug, is_active)')
         .eq('is_active', true)
+        .eq('links.is_active', true)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data ?? []

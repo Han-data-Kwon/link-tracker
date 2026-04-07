@@ -33,13 +33,13 @@ async function sendEmail(to: string, subject: string, html: string) {
 async function getLastSentAt(alertId: string): Promise<Date | null> {
   const { data } = await supabase
     .from('alert_logs')
-    .select('created_at')
+    .select('triggered_at')
     .eq('alert_id', alertId)
-    .order('created_at', { ascending: false })
+    .order('triggered_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  return data ? new Date(data.created_at) : null
+  return data ? new Date(data.triggered_at) : null
 }
 
 // ──────────────────────────────────────────────
@@ -116,8 +116,9 @@ Deno.serve(async (_req) => {
   try {
     const { data: alerts, error } = await supabase
       .from('alerts')
-      .select('*, links(title, slug, full_url)')
+      .select('*, links!inner(title, slug, full_url, is_active)')
       .eq('is_active', true)
+      .eq('links.is_active', true)
 
     if (error) throw error
     if (!alerts || alerts.length === 0) {
