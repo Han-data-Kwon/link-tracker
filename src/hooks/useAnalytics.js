@@ -7,12 +7,12 @@ export function useActiveLinks() {
     queryKey: ['active-links'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('links')
-        .select('id, title, slug')
+        .from('link_total_stats')
+        .select('link_id, title, slug')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data ?? []
+      return (data ?? []).map(r => ({ id: r.link_id, title: r.title, slug: r.slug }))
     },
   })
 }
