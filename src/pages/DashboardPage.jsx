@@ -92,7 +92,7 @@ function LinkFilterDropdown({ links, selectedIds, onChange }) {
 }
 
 export default function DashboardPage() {
-  const [days, setDays] = useState(30)
+  const [days, setDays] = useState(7)
   const [selectedLinkIds, setSelectedLinkIds] = useState([])
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const queryClient = useQueryClient()
@@ -226,7 +226,7 @@ export default function DashboardPage() {
       {/* 하단 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <TopLinks linkIds={selectedLinkIds} />
+          <TopLinks linkIds={selectedLinkIds} days={days} />
         </div>
         <div className="space-y-6">
           <SourceBreakdown linkIds={selectedLinkIds} />

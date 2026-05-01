@@ -162,22 +162,42 @@ export function useTagStats({ linkIds = [] } = {}) {
   })
 }
 
-export function useTopLinks({ limit = 10, linkIds = [] } = {}) {
+export function useTopLinks({ limit = 10, linkIds = [], days = 30 } = {}) {
   return useQuery({
-    queryKey: ['top-links', limit, linkIds],
+    queryKey: ['top-links', limit, linkIds, days],
     queryFn: async () => {
+      const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
       let query = supabase
-        .from('link_total_stats')
-        .select('*')
+        .from('link_daily_stats')
+        .select('link_id, title, slug, utm_source, utm_campaign, total_impressions, unique_clicks')
         .eq('is_active', true)
-        .order('total_impressions', { ascending: false })
-        .limit(limit)
+        .gte('click_date', since)
 
       if (linkIds.length > 0) query = query.in('link_id', linkIds)
 
       const { data, error } = await query
       if (error) throw error
-      return data ?? []
+
+      const byLink = {}
+      for (const row of data ?? []) {
+        if (!byLink[row.link_id]) {
+          byLink[row.link_id] = {
+            link_id: row.link_id,
+            title: row.title,
+            slug: row.slug,
+            utm_source: row.utm_source,
+            utm_campaign: row.utm_campaign,
+            total_impressions: 0,
+            unique_clicks: 0,
+          }
+        }
+        byLink[row.link_id].total_impressions += Number(row.total_impressions) || 0
+        byLink[row.link_id].unique_clicks += Number(row.unique_clicks) || 0
+      }
+
+      return Object.values(byLink)
+        .sort((a, b) => b.total_impressions - a.total_impressions)
+        .slice(0, limit)
     },
   })
 }

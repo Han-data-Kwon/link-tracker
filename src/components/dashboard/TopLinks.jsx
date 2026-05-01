@@ -2,12 +2,12 @@ import { useTopLinks } from '../../hooks/useAnalytics'
 import Spinner from '../ui/Spinner'
 import Badge from '../ui/Badge'
 
-export default function TopLinks({ linkIds = [] }) {
-  const { data: links = [], isLoading } = useTopLinks({ limit: 10, linkIds })
+export default function TopLinks({ linkIds = [], days = 7 }) {
+  const { data: links = [], isLoading } = useTopLinks({ limit: 10, linkIds, days })
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h3 className="text-base font-semibold text-gray-900 mb-4">상위 링크 (클릭순)</h3>
+      <h3 className="text-base font-semibold text-gray-900 mb-4">상위 링크 (최근 {days}일, 클릭순)</h3>
       {isLoading ? (
         <div className="flex justify-center py-8"><Spinner /></div>
       ) : links.length === 0 ? (

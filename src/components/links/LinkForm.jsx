@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { buildUtmUrl } from '../../lib/utm'
 import { generateSlug, isValidSlug } from '../../lib/slug'
 import { useCreateLink } from '../../hooks/useLinks'
-import { useTags } from '../../hooks/useTags'
+import { useTags, useCreateTag } from '../../hooks/useTags'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
+
+const TAG_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#06b6d4']
 
 const EMPTY_UTM = { source: '', medium: '', campaign: '', term: '', content: '' }
 
@@ -16,11 +18,15 @@ export default function LinkForm({ onSuccess }) {
     utm: { ...EMPTY_UTM },
     tagIds: [],
   })
-  const [preview, setPreview] = useState('')
-  const [errors, setErrors] = useState({})
+  const [preview, setPreview]         = useState('')
+  const [errors, setErrors]           = useState({})
+  const [newTagName, setNewTagName]   = useState('')
+  const [newTagColor, setNewTagColor] = useState('#6366f1')
+  const [showNewTag, setShowNewTag]   = useState(false)
 
   const { data: tags = [] } = useTags()
   const createLink = useCreateLink()
+  const createTag  = useCreateTag()
 
   function set(field, value) {
     const next = { ...form, [field]: value }
@@ -60,9 +66,23 @@ export default function LinkForm({ onSuccess }) {
       })
       setForm({ destinationUrl: '', title: '', slug: '', utm: { ...EMPTY_UTM }, tagIds: [] })
       setPreview('')
+      setShowNewTag(false)
       onSuccess?.()
     } catch (err) {
       setErrors({ submit: err.message })
+    }
+  }
+
+  async function handleCreateTag() {
+    if (!newTagName.trim()) return
+    try {
+      const tag = await createTag.mutateAsync({ name: newTagName.trim(), color: newTagColor })
+      setForm(prev => ({ ...prev, tagIds: [...prev.tagIds, tag.id] }))
+      setNewTagName('')
+      setNewTagColor('#6366f1')
+      setShowNewTag(false)
+    } catch (err) {
+      setErrors(prev => ({ ...prev, newTag: err.message }))
     }
   }
 
@@ -119,28 +139,66 @@ export default function LinkForm({ onSuccess }) {
       </div>
 
       {/* 태그 */}
-      {tags.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">태그</h3>
-          <div className="flex flex-wrap gap-2">
-            {tags.map(tag => (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() => toggleTag(tag.id)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors`}
-                style={
-                  form.tagIds.includes(tag.id)
-                    ? { backgroundColor: tag.color, color: '#fff', borderColor: tag.color }
-                    : { backgroundColor: 'transparent', color: tag.color, borderColor: tag.color }
-                }
-              >
-                {tag.name}
-              </button>
-            ))}
-          </div>
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">태그</h3>
+        <div className="flex flex-wrap gap-2">
+          {tags.map(tag => (
+            <button
+              key={tag.id}
+              type="button"
+              onClick={() => toggleTag(tag.id)}
+              className="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
+              style={
+                form.tagIds.includes(tag.id)
+                  ? { backgroundColor: tag.color, color: '#fff', borderColor: tag.color }
+                  : { backgroundColor: 'transparent', color: tag.color, borderColor: tag.color }
+              }
+            >
+              {tag.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowNewTag(v => !v)}
+            className="px-3 py-1 rounded-full text-xs font-medium border border-dashed border-gray-400 text-gray-500 hover:border-gray-600 hover:text-gray-700 transition-colors"
+          >
+            + 새 태그
+          </button>
         </div>
-      )}
+
+        {showNewTag && (
+          <div className="flex items-center gap-2 mt-2 p-3 bg-gray-50 rounded-lg">
+            <input
+              type="text"
+              placeholder="태그 이름"
+              value={newTagName}
+              onChange={e => setNewTagName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleCreateTag())}
+              className="flex-1 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+            <div className="flex gap-1">
+              {TAG_COLORS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setNewTagColor(c)}
+                  className={`w-5 h-5 rounded-full border-2 transition-all ${newTagColor === c ? 'border-gray-800 scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleCreateTag}
+              disabled={createTag.isPending || !newTagName.trim()}
+              className="px-2 py-1.5 text-xs bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+        )}
+        {errors.newTag && <p className="text-xs text-red-500">{errors.newTag}</p>}
+      </div>
 
       {/* 미리보기 */}
       {preview && (

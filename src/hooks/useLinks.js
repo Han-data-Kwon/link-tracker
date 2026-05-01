@@ -104,6 +104,75 @@ export function useBulkCreateLinks() {
   })
 }
 
+export function useUpdateLink() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, destinationUrl, title, slug, utm, tagIds = [] }) => {
+      const fullUrl = buildUtmUrl(destinationUrl, utm)
+
+      const { error } = await supabase
+        .from('links')
+        .update({
+          title,
+          slug,
+          destination_url: destinationUrl,
+          full_url: fullUrl,
+          utm_source:   utm.source   || null,
+          utm_medium:   utm.medium   || null,
+          utm_campaign: utm.campaign || null,
+          utm_term:     utm.term     || null,
+          utm_content:  utm.content  || null,
+        })
+        .eq('id', id)
+      if (error) throw error
+
+      const { error: delErr } = await supabase.from('link_tags').delete().eq('link_id', id)
+      if (delErr) throw delErr
+
+      if (tagIds.length > 0) {
+        const { error: tagErr } = await supabase
+          .from('link_tags')
+          .insert(tagIds.map(tag_id => ({ link_id: id, tag_id })))
+        if (tagErr) throw tagErr
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['links'] })
+      queryClient.invalidateQueries({ queryKey: ['active-links'] })
+      queryClient.invalidateQueries({ queryKey: ['top-links'] })
+      queryClient.invalidateQueries({ queryKey: ['tag-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['source-breakdown'] })
+      queryClient.invalidateQueries({ queryKey: ['link-tags'] })
+    },
+  })
+}
+
+export function useDeleteLink() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from('links')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['links'] })
+      queryClient.invalidateQueries({ queryKey: ['active-links'] })
+      queryClient.invalidateQueries({ queryKey: ['daily-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['summary-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['top-links'] })
+      queryClient.invalidateQueries({ queryKey: ['source-breakdown'] })
+      queryClient.invalidateQueries({ queryKey: ['tag-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['alerts-all'] })
+      queryClient.invalidateQueries({ queryKey: ['alert-logs'] })
+    },
+  })
+}
+
 export function useToggleLinkActive() {
   const queryClient = useQueryClient()
 
