@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { useToggleLinkActive, useDeleteLink } from '../../hooks/useLinks'
+import { useAuth } from '../../hooks/useAuth'
 import Badge from '../ui/Badge'
 import QRModal from './QRModal'
 import AlertSettings from './AlertSettings'
@@ -15,8 +16,10 @@ export default function LinkRow({ link }) {
 
   const toggleActive = useToggleLinkActive()
   const deleteLink   = useDeleteLink()
+  const { user, profile } = useAuth()
 
   const linkId   = link.link_id || link.id
+  const canEdit  = profile?.role === 'admin' || link.user_id === user?.id
   const trackUrl = `${window.location.origin}/r/${link.slug}`
 
   function copyUrl() {
@@ -68,7 +71,7 @@ export default function LinkRow({ link }) {
           </span>
         </td>
         <td className="px-4 py-3">
-          {link.is_active ? (
+          {canEdit && (link.is_active ? (
             <button
               onClick={() => toggleActive.mutate({ id: linkId, is_active: false })}
               className="relative inline-flex h-5 w-9 rounded-full transition-colors focus:outline-none bg-primary-600"
@@ -82,7 +85,7 @@ export default function LinkRow({ link }) {
             >
               재활성화
             </button>
-          )}
+          ))}
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1">
@@ -119,27 +122,31 @@ export default function LinkRow({ link }) {
               </svg>
             </button>
             {/* 링크 수정 */}
-            <button
-              onClick={() => setEditOpen(true)}
-              title="링크 수정"
-              className="p-1.5 rounded hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => setEditOpen(true)}
+                title="링크 수정"
+                className="p-1.5 rounded hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
             {/* 링크 삭제 */}
-            <button
-              onClick={() => setDeleteOpen(true)}
-              title="링크 삭제"
-              className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => setDeleteOpen(true)}
+                title="링크 삭제"
+                className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         </td>
       </tr>
