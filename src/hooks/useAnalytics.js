@@ -202,6 +202,81 @@ export function useTopLinks({ limit = 10, linkIds = [], days = 30 } = {}) {
   })
 }
 
+const LINK_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
+const TOP_N = 5
+
+export function useLinkDailyStats({ days = 7, linkIds = [] } = {}) {
+  return useQuery({
+    queryKey: ['link-daily-stats', days, linkIds],
+    queryFn: async () => {
+      const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
+
+      let query = supabase
+        .from('link_daily_stats')
+        .select('link_id, title, slug, click_date, total_impressions')
+        .eq('is_active', true)
+        .gte('click_date', since)
+        .not('click_date', 'is', null)
+
+      if (linkIds.length > 0) query = query.in('link_id', linkIds)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      const rows = data ?? []
+
+      // 링크별 기간 합계
+      const linkTotals = {}
+      const linkLabels = {}
+      for (const row of rows) {
+        if (!linkTotals[row.link_id]) {
+          linkTotals[row.link_id] = 0
+          linkLabels[row.link_id] = row.title || row.slug
+        }
+        linkTotals[row.link_id] += Number(row.total_impressions) || 0
+      }
+
+      const sorted = Object.entries(linkTotals).sort(([, a], [, b]) => b - a)
+      const topIds = new Set(sorted.slice(0, TOP_N).map(([id]) => id))
+      const hasOthers = sorted.length > TOP_N
+
+      // 날짜 배열 생성 (오름차순)
+      const dates = []
+      for (let i = days - 1; i >= 0; i--) {
+        dates.push(format(subDays(new Date(), i), 'yyyy-MM-dd'))
+      }
+
+      // 날짜별 초기화
+      const byDate = {}
+      const topKeys = sorted.slice(0, TOP_N).map(([id]) => linkLabels[id])
+      for (const date of dates) {
+        byDate[date] = { date: date.slice(5) }
+        for (const key of topKeys) byDate[date][key] = 0
+        if (hasOthers) byDate[date]['기타'] = 0
+      }
+
+      // 데이터 채우기
+      for (const row of rows) {
+        if (!byDate[row.click_date]) continue
+        const val = Number(row.total_impressions) || 0
+        if (topIds.has(row.link_id)) {
+          const key = linkLabels[row.link_id]
+          byDate[row.click_date][key] = (byDate[row.click_date][key] || 0) + val
+        } else if (hasOthers) {
+          byDate[row.click_date]['기타'] = (byDate[row.click_date]['기타'] || 0) + val
+        }
+      }
+
+      const colorMap = {}
+      topKeys.forEach((key, i) => { colorMap[key] = LINK_COLORS[i] })
+      if (hasOthers) colorMap['기타'] = '#d1d5db'
+      const allKeys = hasOthers ? [...topKeys, '기타'] : topKeys
+
+      return { chartData: Object.values(byDate), linkKeys: allKeys, colorMap }
+    },
+  })
+}
+
 export function useSourceBreakdown({ linkIds = [] } = {}) {
   return useQuery({
     queryKey: ['source-breakdown', linkIds],

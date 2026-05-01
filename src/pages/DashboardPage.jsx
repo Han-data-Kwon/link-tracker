@@ -3,6 +3,7 @@ import { format, subDays } from 'date-fns'
 import { useQueryClient } from '@tanstack/react-query'
 import StatsCard from '../components/dashboard/StatsCard'
 import ClickChart from '../components/dashboard/ClickChart'
+import LinkClickChart from '../components/dashboard/LinkClickChart'
 import HourlyChart from '../components/dashboard/HourlyChart'
 import TagBreakdown from '../components/dashboard/TagBreakdown'
 import TopLinks from '../components/dashboard/TopLinks'
@@ -219,6 +220,9 @@ export default function DashboardPage() {
 
       {/* 일별 클릭 차트 */}
       <ClickChart days={days} linkIds={selectedLinkIds} />
+
+      {/* 링크별 일별 클릭 추이 */}
+      <LinkClickChart days={days} linkIds={selectedLinkIds} />
 
       {/* 시간대별 클릭 차트 */}
       <HourlyChart linkIds={selectedLinkIds} />

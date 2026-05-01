@@ -111,7 +111,7 @@ export function useUpdateLink() {
     mutationFn: async ({ id, destinationUrl, title, slug, utm, tagIds = [] }) => {
       const fullUrl = buildUtmUrl(destinationUrl, utm)
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('links')
         .update({
           title,
@@ -125,7 +125,9 @@ export function useUpdateLink() {
           utm_content:  utm.content  || null,
         })
         .eq('id', id)
+        .select('id')
       if (error) throw error
+      if (!updated || updated.length === 0) throw new Error('수정 권한이 없거나 링크를 찾을 수 없습니다')
 
       const { error: delErr } = await supabase.from('link_tags').delete().eq('link_id', id)
       if (delErr) throw delErr
@@ -153,11 +155,13 @@ export function useDeleteLink() {
 
   return useMutation({
     mutationFn: async (id) => {
-      const { error } = await supabase
+      const { data: deleted, error } = await supabase
         .from('links')
         .delete()
         .eq('id', id)
+        .select('id')
       if (error) throw error
+      if (!deleted || deleted.length === 0) throw new Error('삭제 권한이 없거나 링크를 찾을 수 없습니다')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
@@ -178,11 +182,13 @@ export function useToggleLinkActive() {
 
   return useMutation({
     mutationFn: async ({ id, is_active }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('links')
         .update({ is_active })
         .eq('id', id)
+        .select('id')
       if (error) throw error
+      if (!updated || updated.length === 0) throw new Error('수정 권한이 없거나 링크를 찾을 수 없습니다')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] })
